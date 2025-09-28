@@ -1,0 +1,12 @@
+watchdog
+colorama
+pyyaml
+flask
+requests
+cryptography
+geoip2
+schedule
+flask-socketio
+eventlet
+flask-cors
+

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HoneyGuard Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Roboto Mono', monospace; background: linear-gradient(135deg,#0f172a,#1e293b,#0ea5e9); }
+    .truncate { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .blink { animation: blinker 1s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
+    .toast { position:fixed; top:20px; right:-400px; transition:all 0.5s ease-in-out; }
+    .toast.show { right:20px; }
+  </style>
+</head>
+<body class="text-gray-200">
+
+  <!-- Toast -->
+  <div id="toast" class="toast bg-red-600 text-white px-4 py-3 rounded shadow-lg z-50">
+    🚨 New Alert Detected!
+  </div>
+
+  <!-- Sidebar -->
+  <div class="fixed top-0 left-0 h-full w-16 bg-gray-900 flex flex-col items-center py-6 space-y-6 shadow-xl">
+    <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M12 22c4.97-2 8-6 8-10V5l-8-3-8 3v7c0 4 3.03 8 8 10z"/>
+    </svg>
+    <a href="/" title="Dashboard">
+      <svg class="w-6 h-6 text-gray-400 hover:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6"/>
+      </svg>
+    </a>
+    <a href="/logout" title="Logout">
+      <svg class="w-6 h-6 text-gray-400 hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1m0-13v1"/>
+      </svg>
+    </a>
+  </div>
+
+  <!-- Main Content -->
+  <div class="ml-20 p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-bold text-green-400">🐝 HoneyGuard SOC Dashboard</h1>
+      <div class="flex items-center space-x-4">
+        <span id="threatLevel" class="px-4 py-1 rounded-full text-sm bg-green-600">🟢 Threat Level: Low</span>
+        <span id="status" class="px-4 py-1 rounded-full text-sm bg-green-600">✅ Monitoring Active</span>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="bg-gray-800 p-4 rounded-xl shadow text-center">
+        <p class="text-2xl font-bold" id="total-alerts">0</p>
+        <p class="text-gray-400">Total Alerts</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-xl shadow text-center">
+        <p class="text-2xl font-bold" id="unique-files">0</p>
+        <p class="text-gray-400">Unique Files</p>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-xl shadow text-center">
+        <p class="text-2xl font-bold" id="unique-types">0</p>
+        <p class="text-gray-400">Alert Types</p>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="bg-gray-800 p-4 rounded-2xl shadow-lg">
+        <h2 class="text-lg mb-2">📈 Threats Over Time</h2>
+        <canvas id="alertsOverTime"></canvas>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center">
+        <h2 class="text-lg mb-2">🔐 Security Score</h2>
+        <canvas id="securityScore" width="180" height="180"></canvas>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-2xl shadow-lg">
+        <h2 class="text-lg mb-2">🔥 Top Attack Files</h2>
+        <canvas id="topFiles"></canvas>
+      </div>
+    </div>
+
+    <!-- More Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="bg-gray-800 p-4 rounded-2xl shadow-lg">
+        <h2 class="text-lg mb-2">⚔️ Attack Types</h2>
+        <canvas id="attackTypes"></canvas>
+      </div>
+      <div class="bg-gray-800 p-4 rounded-2xl shadow-lg">
+        <h2 class="text-lg mb-2">🌍 Attack Sources (IP)</h2>
+        <canvas id="ipSources"></canvas>
+      </div>
+    </div>
+
+    <!-- Alerts Table -->
+    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg overflow-x-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold">📋 Recent Alerts</h2>
+        <input type="text" id="search" placeholder="Search alerts..." class="p-2 rounded bg-gray-700 text-white">
+      </div>
+      <table class="table-auto w-full text-sm">
+        <thead>
+          <tr class="text-yellow-400 border-b border-gray-700">
+            <th class="px-2 py-1">Time</th>
+            <th class="px-2 py-1">Level</th>
+            <th class="px-2 py-1">File</th>
+            <th class="px-2 py-1">Action</th>
+            <th class="px-2 py-1">IP</th>
+            <th class="px-2 py-1">User</th>
+            <th class="px-2 py-1">Process</th>
+            <th class="px-2 py-1">Message</th>
+          </tr>
+        </thead>
+        <tbody id="alertTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-96">
+      <h2 class="text-xl font-bold text-yellow-400 mb-4">🔍 Alert Details</h2>
+      <div id="modalContent" class="space-y-2 text-sm text-gray-300"></div>
+      <button onclick="closeModal()" class="mt-4 w-full bg-red-600 py-2 rounded hover:bg-red-700">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const tableBody = document.getElementById("alertTable");
+    const search = document.getElementById("search");
+    let alerts = [];
+
+    fetch("/api/alerts").then(r=>r.json()).then(data=>{
+      alerts=data;
+      renderTable(alerts);
+      updateStats(alerts);
+      updateCharts(alerts);
+      updateThreatLevel(alerts);
+    });
+
+    socket.on("new_alert",(alert)=>{
+      alerts.push(alert);
+      renderTable(alerts);
+      updateStats(alerts);
+      updateCharts(alerts);
+      updateThreatLevel(alerts);
+      showToast("🚨 "+alert.level+" - "+(alert.file||"unknown"));
+      const status=document.getElementById("status");
+      status.classList.remove("bg-green-600");
+      status.classList.add("bg-red-600","blink");
+      status.innerText="⚠️ New Alert Detected!";
+      setTimeout(()=>{
+        status.classList.remove("bg-red-600","blink");
+        status.classList.add("bg-green-600");
+        status.innerText="✅ Monitoring Active";
+      },4000);
+    });
+
+    // Table
+    function renderTable(data){
+      tableBody.innerHTML="";
+      data.slice().reverse().forEach((a,i)=>{
+        let badge=a.level==="ALERT"?"bg-red-600":a.level==="WARN"?"bg-yellow-600":"bg-green-600";
+        tableBody.innerHTML+=`
+          <tr class="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onclick="openModal(${data.length-i-1})">
+            <td class="px-2">${a.timestamp||"-"}</td>
+            <td class="px-2"><span class="px-2 py-1 rounded text-xs ${badge}">${a.level}</span></td>
+            <td class="px-2 truncate max-w-[120px]" title="${a.file}">${a.file||"N/A"}</td>
+            <td class="px-2">${a.action||"N/A"}</td>
+            <td class="px-2">${a.ip||"N/A"}</td>
+            <td class="px-2">${a.user||"System"}</td>
+            <td class="px-2">${a.process? a.process+"("+a.pid+")":"N/A"}</td>
+            <td class="px-2 truncate max-w-[150px]" title="${a.message}">${a.message||"-"}</td>
+          </tr>`;
+      });
+    }
+
+    // Search
+    search.addEventListener("input",()=>{
+      const q=search.value.toLowerCase();
+      const filtered=alerts.filter(a=>JSON.stringify(a).toLowerCase().includes(q));
+      renderTable(filtered);
+    });
+
+    // Stats
+    function updateStats(alerts){
+      document.getElementById("total-alerts").innerText=alerts.length;
+      document.getElementById("unique-files").innerText=new Set(alerts.map(a=>a.file)).size;
+      document.getElementById("unique-types").innerText=new Set(alerts.map(a=>a.level)).size;
+    }
+
+    // Threat Level
+    function updateThreatLevel(alerts){
+      const lvl=document.getElementById("threatLevel");
+      if(alerts.length<5){ lvl.innerText="🟢 Threat Level: Low"; lvl.className="px-4 py-1 rounded-full text-sm bg-green-600"; }
+      else if(alerts.length<15){ lvl.innerText="🟡 Threat Level: Medium"; lvl.className="px-4 py-1 rounded-full text-sm bg-yellow-600"; }
+      else{ lvl.innerText="🔴 Threat Level: High"; lvl.className="px-4 py-1 rounded-full text-sm bg-red-600"; }
+    }
+
+    // Charts
+    function updateCharts(alerts){
+      const hours={},files={},actions={},ips={};
+      alerts.forEach(a=>{
+        const h=a.timestamp?.slice(11,13)||"??";
+        hours[h]=(hours[h]||0)+1;
+        files[a.file||"N/A"]=(files[a.file||"N/A"]||0)+1;
+        actions[a.action||"N/A"]=(actions[a.action||"N/A"]||0)+1;
+        ips[a.ip||"N/A"]=(ips[a.ip||"N/A"]||0)+1;
+      });
+      const colors=["#ef4444","#f59e0b","#22c55e","#3b82f6","#a855f7","#14b8a6","#eab308"];
+      if(window.c1) window.c1.destroy();
+      if(window.c2) window.c2.destroy();
+      if(window.c3) window.c3.destroy();
+      if(window.c4) window.c4.destroy();
+      if(window.c5) window.c5.destroy();
+      window.c1=new Chart(document.getElementById("alertsOverTime"),{type:'line',data:{labels:Object.keys(hours),datasets:[{label:"Alerts/Hour",data:Object.values(hours),borderColor:"#22d3ee",backgroundColor:"rgba(34,211,238,0.2)"}]}});
+      window.c2=new Chart(document.getElementById("topFiles"),{type:'bar',data:{labels:Object.keys(files),datasets:[{label:"Top Files",data:Object.values(files),backgroundColor:"#f59e0b"}]}});
+      window.c3=new Chart(document.getElementById("attackTypes"),{type:'doughnut',data:{labels:Object.keys(actions),datasets:[{data:Object.values(actions),backgroundColor:colors.slice(0,Object.keys(actions).length)}]},options:{cutout:"70%"}});
+      window.c4=new Chart(document.getElementById("ipSources"),{type:'doughnut',data:{labels:Object.keys(ips),datasets:[{data:Object.values(ips),backgroundColor:colors.slice(0,Object.keys(ips).length)}]},options:{cutout:"70%"}});
+      window.c5=new Chart(document.getElementById("securityScore"),{type:'doughnut',data:{labels:["Risk","Safe"],datasets:[{data:[Math.min(alerts.length*5,100),Math.max(100-alerts.length*5,0)],backgroundColor:["#f43f5e","#1f2937"]}]},options:{cutout:"80%",plugins:{legend:{display:false}}}});
+    }
+
+    // Toast
+    function showToast(msg){
+      const toast=document.getElementById("toast");
+      toast.innerText=msg;
+      toast.classList.add("show");
+      setTimeout(()=>toast.classList.remove("show"),4000);
+    }
+
+    // Modal
+    function openModal(index){
+      const a=alerts[index];
+      const mc=document.getElementById("modalContent");
+      mc.innerHTML=`
+        <p><b>Time:</b> ${a.timestamp||"-"}</p>
+        <p><b>Level:</b> ${a.level}</p>
+        <p><b>File:</b> ${a.file||"N/A"}</p>
+        <p><b>Action:</b> ${a.action||"N/A"}</p>
+        <p><b>IP:</b> ${a.ip||"N/A"}</p>
+        <p><b>User:</b> ${a.user||"System"}</p>
+        <p><b>Process:</b> ${a.process? a.process+"("+a.pid+")":"N/A"}</p>
+        <p><b>Message:</b> ${a.message||"-"}</p>
+      `;
+      document.getElementById("modal").classList.remove("hidden");
+    }
+    function closeModal(){ document.getElementById("modal").classList.add("hidden"); }
+  </script>
+</body>
+</html>

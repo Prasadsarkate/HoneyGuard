@@ -1,0 +1,21 @@
+honeyfiles:
+  - passwords.txt
+  - secret_keys.pem
+  - bank_accounts.xlsx
+
+paths:
+  - ./honeyfiles/
+
+rotation:
+  enabled: true
+  interval: daily   # options: hourly, daily, weekly
+  keep_versions: 3
+
+alerts:
+  - log
+  - telegram
+  - webhook
+
+logging:
+  format: jsonl     # jsonl or text
+  encrypted: false  # if true, uses AES via utils/encryption.py

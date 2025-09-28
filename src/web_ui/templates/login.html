@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HoneyGuard Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: -400px;
+      min-width: 280px;
+      transition: all 0.5s ease-in-out;
+      z-index: 9999;
+    }
+    .toast.show { right: 20px; }
+  </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen font-mono">
+
+  <!-- Toast Notification -->
+  {% if error %}
+  <div id="toast" class="toast show bg-red-600 text-white px-4 py-3 rounded-lg shadow-lg border border-red-400">
+    <strong class="block font-bold">🚨 Login Failed</strong>
+    <span class="text-sm">{{ error }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Login Card -->
+  <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-yellow-400/30">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-extrabold text-yellow-400 drop-shadow">🐝 HoneyGuard</h1>
+      <p class="text-gray-400 text-sm">🚀 Secure Admin Access</p>
+    </div>
+
+    <!-- Form (now connected to backend) -->
+    <form method="POST" action="/login" class="space-y-5">
+      <div>
+        <label for="email" class="block text-gray-300 text-sm">Email</label>
+        <input type="text" id="email" name="email" placeholder="you@domain.com" required
+          class="w-full p-3 mt-1 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition">
+      </div>
+
+      <div>
+        <label for="password" class="block text-gray-300 text-sm">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required
+          class="w-full p-3 mt-1 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition">
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input type="checkbox" id="not-attacker" class="h-4 w-4 text-yellow-400 focus:ring-yellow-400 border-gray-600 rounded">
+        <label for="not-attacker" class="text-gray-300 text-sm">I am not an attacker 😈</label>
+      </div>
+
+      <button type="submit"
+        class="w-full py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold rounded-lg shadow hover:shadow-yellow-500/50 transition transform hover:-translate-y-0.5">
+        Login
+      </button>
+    </form>
+
+    <div class="mt-6 text-center text-sm text-gray-500">
+      <p class="hint">&gt; monitoring agent: <span class="text-green-400">active</span> — probes: <span class="text-green-400">7</span></p>
+      <p class="addr text-yellow-400 font-mono mt-1">0x4A3F...9B2C</p>
+    </div>
+  </div>
+
+  <script>
+    // Auto-hide toast after 4s
+    setTimeout(() => {
+      const toast = document.getElementById("toast");
+      if (toast) toast.classList.remove("show");
+    }, 4000);
+  </script>
+</body>
+</html>
