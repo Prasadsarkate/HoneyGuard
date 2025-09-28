@@ -84,6 +84,10 @@ To explicitly run the dashboard server:
 ```bash
 python3 src/web_ui/app.py
 ```
+```bash
+username :- admin@honeyguard.com
+password :- secure123
+```
 
 Then open: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
